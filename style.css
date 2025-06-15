@@ -1,0 +1,21 @@
+#box {
+    background-color: blueviolet;
+}
+.class{
+    color: blue;
+}
+.button-container {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1rem;
+}
+
+
+button {
+  padding: 0.6rem 1.2rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
