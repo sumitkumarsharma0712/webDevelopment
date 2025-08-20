@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Car Racing Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Background Video */
+    video.bgVideo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
+
+    /* Dashboard */
+    .dashboard {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 20px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px 20px;
+      border-radius: 10px;
+      z-index: 10;
+    }
+
+    /* Road */
+    .road {
+      position: relative;
+      width: 400px;
+      height: 100vh;
+      margin: auto;
+      border-left: 10px solid white;
+      border-right: 10px solid white;
+      overflow: hidden;
+    }
+
+    /* Lane lines */
+    .line {
+      position: absolute;
+      width: 10px;
+      height: 100px;
+      background: white;
+      left: 50%;
+      top: -100px;
+      transform: translateX(-50%);
+      animation: moveLines 1s linear infinite;
+    }
+    @keyframes moveLines {
+      0% { top: -100px; }
+      100% { top: 100vh; }
+    }
+
+    /* Player Car */
+    .car {
+      position: absolute;
+      width: 70px;
+      height: 130px;
+      bottom: 20px;
+      left: 170px;
+      transition: left 0.2s;
+    }
+    .car img {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Opponent Cars */
+    .opponent {
+      position: absolute;
+      width: 70px;
+      height: 130px;
+      top: -150px;
+    }
+    .opponent img {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Car Selection Menu */
+    .menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+      z-index: 1000;
+    }
+    .car-option {
+      width: 70px;
+      height: 130px;
+      margin: 10px;
+      display: inline-block;
+      cursor: pointer;
+    }
+    .car-option img {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background 3D Video -->
+  <video autoplay loop muted class="bgVideo" id="bgVideo">
+    <source src="https://cdn.coverr.co/videos/coverr-driving-on-a-highway-8331/1080p.mp4" type="video/mp4">
+  </video>
+
+  <!-- Dashboard -->
+  <div class="dashboard">
+    🏎 Score: <span id="score">0</span> | ⚡ Level: <span id="level">1</span> | 🏆 High Score: <span id="highScore">0</span>
+  </div>
+
+  <!-- Game Area -->
+  <div class="road" id="road">
+    <div class="line"></div>
+    <div class="line" style="animation-delay: 0.5s;"></div>
+    <div class="car" id="player"><img id="playerImg" src=""></div>
+  </div>
+
+  <!-- Car Selection Menu -->
+  <div class="menu" id="menu">
+    <h1>Select Your Car</h1>
+    <div>
+      <div class="car-option" onclick="selectCar('//red-sport-car.jpg')">
+        <img src="red-sport-car.jpg">
+      </div>
+      <div class="car-option" onclick="selectCar('//car.jpg')">
+        <img src="car.jpg">
+      </div>
+        <div class="car-option" onclick="selectCar('//race-car-top-view-.jpg')">
+            <img src="race-car-top-view-.jpg">
+    </div>
+        <div class="car-option" onclick="selectCar('//top-view-racing-car-.webp')">
+            <img src="top-view-racing-car-.webp">
+        </div>
+  </div>
+
+  <!-- Racing Sound -->
+  <audio id="raceSound" loop>
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_41d82bb17a.mp3?filename=racing-car-6952.mp3" type="audio/mp3">
+  </audio>
+
+  <script>
+    const player = document.getElementById("player");
+    const playerImg = document.getElementById("playerImg");
+    const road = document.getElementById("road");
+    const scoreDisplay = document.getElementById("score");
+    const levelDisplay = document.getElementById("level");
+    const highScoreDisplay = document.getElementById("highScore");
+    const raceSound = document.getElementById("raceSound");
+    const menu = document.getElementById("menu");
+    const bgVideo = document.getElementById("bgVideo");
+
+    // Background videos for different levels
+    const backgrounds = [
+      "https://cdn.coverr.co/videos/coverr-driving-on-a-highway-8331/1080p.mp4", // Highway
+      "https://cdn.coverr.co/videos/coverr-desert-road-7376/1080p.mp4",         // Desert
+      "https://cdn.coverr.co/videos/coverr-driving-through-forest-8240/1080p.mp4", // Forest
+      "https://youtu.be/qoMU5DeY0tk?si=nGA7svxcv7w1z1Jc"     // Night City
+    ];
+
+    let score = 0;
+    let level = 1;
+    let speed = 3;
+    let playerX = 170;
+    let gameOver = false;
+
+    let highScore = localStorage.getItem("highScore") || 0;
+    highScoreDisplay.innerText = highScore;
+
+    function selectCar(imgUrl) {
+      playerImg.src = imgUrl;
+      menu.style.display = "none";
+      raceSound.play();
+      startGame();
+    }
+
+    // Controls
+    document.addEventListener("keydown", (e) => {
+      if(gameOver) return;
+      if(e.key === "ArrowLeft" && playerX > 40) {
+        playerX -= 70;
+        player.style.left = playerX + "px";
+      }
+      else if(e.key === "ArrowRight" && playerX < 300) {
+        playerX += 70;
+        player.style.left = playerX + "px";
+      }
+    });
+
+    // Spawn Opponents
+    function spawnOpponent() {
+      if(gameOver) return;
+      const opp = document.createElement("div");
+      opp.classList.add("opponent");
+      opp.innerHTML = `<img src="">`;
+      opp.style.left = (Math.floor(Math.random() * 5) * 70 + 40) + "px";
+      road.appendChild(opp);
+
+      let moveInterval = setInterval(() => {
+        if(gameOver) {
+          clearInterval(moveInterval);
+          opp.remove();
+          return;
+        }
+
+        let top = parseInt(opp.style.top || -150);
+        opp.style.top = top + speed + "px";
+
+        const playerRect = player.getBoundingClientRect();
+        const oppRect = opp.getBoundingClientRect();
+        if (
+          playerRect.x < oppRect.x + oppRect.width &&
+          playerRect.x + playerRect.width > oppRect.x &&
+          playerRect.y < oppRect.y + oppRect.height &&
+          playerRect.height + playerRect.y > oppRect.y
+        ) {
+          gameOver = true;
+          raceSound.pause();
+          if(score > highScore) {
+            localStorage.setItem("highScore", score);
+          }
+          document.querySelector(".dashboard").innerHTML = "💀 Game Over! Final Score: " + score + " (Refresh to Restart)";
+          clearInterval(moveInterval);
+        }
+
+        if(top > window.innerHeight) {
+          opp.remove();
+          score++;
+          scoreDisplay.innerText = score;
+
+          // Level up every 10 points
+          if(score % 10 === 0) {
+            level++;
+            levelDisplay.innerText = level;
+            speed++;
+
+            // Change background when reaching next level
+            const videoIndex = (level - 1) % backgrounds.length;
+            bgVideo.src = backgrounds[videoIndex];
+            bgVideo.play();
+          }
+        }
+      }, 30);
+
+      setTimeout(spawnOpponent, Math.random() * 2000 + 1000);
+    }
+
+    function startGame() {
+      spawnOpponent();
+    }
+  </script>
+</body>
+</html>

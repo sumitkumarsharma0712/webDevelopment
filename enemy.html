@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Outlaw - Levels</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+
+    .dashboard {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 50px;
+      background: #111;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      font-size: 18px;
+      z-index: 10;
+    }
+
+    canvas {
+      display: block;
+      margin: auto;
+      background: radial-gradient(circle at top, #1a1a40, #000);
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div>🎯 Score: <span id="score">0</span></div>
+    <div>❤️ Lives: <span id="lives">3</span></div>
+    <div>⚡ Level: <span id="level">1</span></div>
+  </div>
+
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Dashboard
+    let score = 0;
+    let lives = 3;
+    let level = 1;
+
+    // Ball
+    let ballRadius = 10;
+    let x = canvas.width/2;
+    let y = canvas.height-60;
+    let dx = 3;
+    let dy = -3;
+
+    // Paddle (Spaceship)
+    let paddleHeight = 20;
+    let paddleWidth = 100;
+    let paddleX = (canvas.width-paddleWidth)/2;
+
+    let rightPressed = false;
+    let leftPressed = false;
+    let spacePressed = false;
+
+    // Bullets
+    let bullets = [];
+
+    // Enemy setup
+    let enemyRowCount, enemyColumnCount;
+    let enemyWidth = 80;
+    let enemyHeight = 30;
+    let enemyPadding = 15;
+    let enemyOffsetTop = 70;
+    let enemyOffsetLeft = 35;
+    let enemies = [];
+
+    function initEnemies() {
+      enemies = [];
+      enemyRowCount = 3 + level; // हर लेवल पर row बढ़ेगी
+      enemyColumnCount = 6 + Math.min(level, 4); // थोड़ी columns भी बढ़ेंगी
+      for(let c=0; c<enemyColumnCount; c++) {
+        enemies[c] = [];
+        for(let r=0; r<enemyRowCount; r++) {
+          enemies[c][r] = { x: 0, y: 0, status: 1, type: Math.random() > (0.85 - level*0.05) ? "boss" : "normal" };
+        }
+      }
+    }
+    initEnemies();
+
+    // Key events
+    document.addEventListener("keydown", keyDownHandler);
+    document.addEventListener("keyup", keyUpHandler);
+
+    function keyDownHandler(e) {
+      if(e.key === "Right" || e.key === "ArrowRight") rightPressed = true;
+      else if(e.key === "Left" || e.key === "ArrowLeft") leftPressed = true;
+      else if(e.code === "Space") spacePressed = true;
+    }
+    function keyUpHandler(e) {
+      if(e.key === "Right" || e.key === "ArrowRight") rightPressed = false;
+      else if(e.key === "Left" || e.key === "ArrowLeft") leftPressed = false;
+      else if(e.code === "Space") spacePressed = false;
+    }
+
+    // Fire bullets
+    function shoot() {
+      if(spacePressed && Math.random() < 0.12) { // limit firing rate
+        bullets.push({x: paddleX + paddleWidth/2 - 2, y: canvas.height - paddleHeight - 20});
+      }
+    }
+
+    // Collision detection
+    function collisionDetection() {
+      let allCleared = true;
+      for(let c=0; c<enemyColumnCount; c++) {
+        for(let r=0; r<enemyRowCount; r++) {
+          let e = enemies[c][r];
+          if(e.status === 1) {
+            allCleared = false;
+
+            // Ball hit
+            if(x > e.x && x < e.x+enemyWidth && y > e.y && y < e.y+enemyHeight) {
+              dy = -dy;
+              e.status = 0;
+              score += (e.type === "boss") ? 50 : 20;
+              document.getElementById("score").innerText = score;
+            }
+
+            // Bullet hit
+            bullets.forEach((b, index) => {
+              if(b.x > e.x && b.x < e.x+enemyWidth && b.y > e.y && b.y < e.y+enemyHeight) {
+                e.status = 0;
+                bullets.splice(index,1);
+                score += (e.type === "boss") ? 50 : 20;
+                document.getElementById("score").innerText = score;
+              }
+            });
+          }
+        }
+      }
+
+      // अगर सारे enemies मर गए → अगला level
+      if(allCleared) {
+        level++;
+        document.getElementById("level").innerText = level;
+
+        // Level difficulty बढ़ाएँ
+        dx += 1;
+        dy = (dy > 0 ? dy+1 : dy-1);
+        paddleWidth = Math.max(60, paddleWidth - 10); // paddle छोटा होगा
+
+        alert("🚀 Level " + level + " Unlocked!");
+        x = canvas.width/2;
+        y = canvas.height-60;
+        dx = (dx>0?dx:-dx);
+        dy = -Math.abs(dy);
+        paddleX = (canvas.width-paddleWidth)/2;
+
+        initEnemies();
+      }
+    }
+
+    // Draw ball
+    function drawBall() {
+      ctx.beginPath();
+      ctx.arc(x, y, ballRadius, 0, Math.PI*2);
+      ctx.fillStyle = "lime";
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    // Draw paddle (spaceship)
+    function drawPaddle() {
+      ctx.beginPath();
+      ctx.rect(paddleX, canvas.height-paddleHeight-10, paddleWidth, paddleHeight);
+      ctx.fillStyle = "cyan";
+      ctx.fill();
+      ctx.closePath();
+
+      ctx.fillStyle = "yellow";
+      ctx.fillRect(paddleX+paddleWidth/2-10, canvas.height-paddleHeight-20, 20, 10);
+    }
+
+    // Draw bullets
+    function drawBullets() {
+      ctx.fillStyle = "red";
+      bullets.forEach((b) => {
+        ctx.fillRect(b.x, b.y, 4, 10);
+      });
+    }
+
+    function updateBullets() {
+      bullets.forEach((b) => { b.y -= 7; });
+      bullets = bullets.filter(b => b.y > 0);
+    }
+
+    // Draw enemies
+    function drawEnemies() {
+      for(let c=0; c<enemyColumnCount; c++) {
+        for(let r=0; r<enemyRowCount; r++) {
+          if(enemies[c][r].status === 1) {
+            let enemyX = (c*(enemyWidth+enemyPadding))+enemyOffsetLeft;
+            let enemyY = (r*(enemyHeight+enemyPadding))+enemyOffsetTop;
+            enemies[c][r].x = enemyX;
+            enemies[c][r].y = enemyY;
+            ctx.beginPath();
+            ctx.rect(enemyX, enemyY, enemyWidth, enemyHeight);
+            ctx.fillStyle = (enemies[c][r].type==="boss") ? "purple" : "orange";
+            ctx.fill();
+            ctx.closePath();
+          }
+        }
+      }
+    }
+
+    // Main game loop
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawEnemies();
+      drawBall();
+      drawPaddle();
+      drawBullets();
+
+      collisionDetection();
+      updateBullets();
+      shoot();
+
+      // Ball bounce
+      if(x + dx > canvas.width-ballRadius || x + dx < ballRadius) dx = -dx;
+      if(y + dy < ballRadius) dy = -dy;
+      else if(y + dy > canvas.height-ballRadius) {
+        if(x > paddleX && x < paddleX + paddleWidth) {
+          dy = -dy;
+        } else {
+          lives--;
+          document.getElementById("lives").innerText = lives;
+          if(!lives) {
+            alert("💀 Game Over");
+            document.location.reload();
+          } else {
+            x = canvas.width/2;
+            y = canvas.height-60;
+            dx = 3+level;
+            dy = -(3+level);
+            paddleX = (canvas.width-paddleWidth)/2;
+          }
+        }
+      }
+
+      x += dx;
+      y += dy;
+
+      if(rightPressed && paddleX < canvas.width-paddleWidth) paddleX += 7;
+      else if(leftPressed && paddleX > 0) paddleX -= 7;
+
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  </script>
+</body>
+</html>

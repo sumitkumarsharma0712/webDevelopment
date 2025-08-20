@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+<style>
+    .ball{
+        width:100px;
+        margin:10px auto;
+        height: 100px;
+        background:linear-gradient(rgb(255, 98, 0),rgb(109, 109, 205),rgb(128, 0, 255));
+        border-radius: 50%;
+        border: 5px solid black;
+        animation-name: bounce;
+        animation-duration: 900ms;
+        animation-timing-function: ease-in;
+        animation-iteration-count: infinite;
+
+        animation-direction: alternate;
+
+
+        
+    }
+    @keyframes bounce{
+        0%{
+            transform: translateY(0px);
+        }
+        100%{
+            transform: translateY(85vh)rotate(360deg);
+        }
+
+    }
+        
+    
+    
+</style>
+</head>
+<body>
+    <div class="ball">
+        </div>
+</body>
+</html>
