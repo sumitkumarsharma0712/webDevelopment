@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D Helicopter Game</title>
+<style>
+  body { margin:0; background:black; overflow:hidden; }
+  canvas { display:block; margin:auto; }
+  #hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+    font-family: Arial, sans-serif;
+    color: white;
+  }
+  #healthBar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 200px;
+    height: 20px;
+    border: 2px solid #fff;
+    background: red;
+  }
+  #healthFill {
+    height: 100%;
+    background: lime;
+    width: 100%;
+  }
+  #score {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 20px;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="healthBar"><div id="healthFill"></div></div>
+  <div id="score">Score: 0</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+<script>
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+let renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Light
+let light = new THREE.DirectionalLight(0xffffff,1);
+light.position.set(5,10,5);
+scene.add(light);
+
+// Helicopter
+let helicopter = new THREE.Group();
+
+// Body
+let body = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,1.5,16), new THREE.MeshPhongMaterial({color:0x00ffcc}));
+body.rotation.z = Math.PI/2;
+helicopter.add(body);
+
+// Cockpit
+let cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16), new THREE.MeshPhongMaterial({color:0x0099ff, transparent:true, opacity:0.7}));
+cockpit.position.set(0.8,0,0);
+helicopter.add(cockpit);
+
+// Rotor
+let rotor = new THREE.Mesh(new THREE.BoxGeometry(2,0.05,0.1), new THREE.MeshPhongMaterial({color:0x333333}));
+rotor.position.set(0,0.4,0);
+helicopter.add(rotor);
+
+helicopter.scale.set(0.7,0.7,0.7);
+helicopter.position.set(-4,-1.5,0);
+scene.add(helicopter);
+
+// Camera behind helicopter
+camera.position.set(-6,0,5);
+camera.lookAt(helicopter.position);
+
+// Enemies
+function createEnemy() {
+  let enemy = new THREE.Group();
+  let fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,1.2,12), new THREE.MeshPhongMaterial({color:0xff3333}));
+  fuselage.rotation.z = Math.PI/2;
+  enemy.add(fuselage);
+  let wing = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.05,0.3), new THREE.MeshPhongMaterial({color:0xaa0000}));
+  enemy.add(wing);
+  return enemy;
+}
+
+let enemies = [];
+let rockets = [];
+let score = 0;
+let health = 100;
+
+// Controls
+let keys = {};
+document.addEventListener('keydown', e=> keys[e.code]=true);
+document.addEventListener('keyup', e=> keys[e.code]=false);
+
+// Shoot rockets
+document.addEventListener('keydown', e=>{
+  if(e.code==='Space'){
+    let rocket = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.4,8), new THREE.MeshPhongMaterial({color:0xffff00}));
+    rocket.rotation.z = Math.PI/2;
+    rocket.position.copy(helicopter.position);
+    rocket.position.x += 1;
+    scene.add(rocket);
+    rockets.push(rocket);
+  }
+});
+
+// Spawn enemies
+function spawnEnemy() {
+  let enemy = createEnemy();
+  enemy.position.set(6, (Math.random()*4)-2, (Math.random()*4)-2);
+  scene.add(enemy);
+  enemies.push(enemy);
+}
+setInterval(spawnEnemy,2000);
+
+// HUD update
+function updateHUD(){
+  document.getElementById('score').innerText = "Score: "+score;
+  document.getElementById('healthFill').style.width = health+"%";
+}
+
+// Animate
+function animate(){
+  requestAnimationFrame(animate);
+
+  // Controls
+  if(keys['ArrowUp']) helicopter.position.y += 0.05;
+  if(keys['ArrowDown']) helicopter.position.y -= 0.05;
+  if(keys['ArrowLeft']) helicopter.position.z += 0.05;
+  if(keys['ArrowRight']) helicopter.position.z -= 0.05;
+
+  // Rockets
+  for(let i=rockets.length-1;i>=0;i--){
+    rockets[i].position.x += 0.2;
+    if(rockets[i].position.x>10){
+      scene.remove(rockets[i]);
+      rockets.splice(i,1);
+      continue;
+    }
+    for(let j=enemies.length-1;j>=0;j--){
+      if(rockets[i].position.distanceTo(enemies[j].position)<0.5){
+        scene.remove(enemies[j]);
+        enemies.splice(j,1);
+        scene.remove(rockets[i]);
+        rockets.splice(i,1);
+        score+=10;
+        break;
+      }
+    }
+  }
+
+  // Enemies move
+  for(let j=enemies.length-1;j>=0;j--){
+    enemies[j].position.x -= 0.05;
+    if(enemies[j].position.x<-8){
+      scene.remove(enemies[j]);
+      enemies.splice(j,1);
+      health-=10;
+      if(health<0) health=0;
+    }
+  }
+
+  // Rotor spin
+  rotor.rotation.y += 0.5;
+
+  updateHUD();
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>

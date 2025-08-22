@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3D Helicopter Game — Fullscreen, Enemies Fire, Explosions</title>
+  <style>
+    html,body{height:100%;margin:0;font-family:sans-serif;background:#000}
+    #game{width:100vw;height:100vh;display:block;overflow:hidden}
+    .hud{position:fixed;left:16px;top:16px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6);z-index:10}
+    .hud .score{font-size:20px;font-weight:700}
+    .hud .info{font-size:13px;opacity:.95}
+    .centerUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:16px;border-radius:10px;text-align:center;max-width:520px;z-index:11}
+    button{background:#1e90ff;border:none;padding:8px 12px;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;margin:6px}
+    .hint{position:fixed;right:16px;bottom:16px;padding:8px;border-radius:8px;background:rgba(0,0,0,.5);color:#fff;z-index:10}
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <div class="hud">
+    <div class="score">Score: <span id="score">0</span></div>
+    <div class="info">Alt: <span id="alt">0.0</span>m | Spd: <span id="spd">0.0</span> | Lv: <span id="lvl">1</span></div>
+  </div>
+  <div id="overlay" class="centerUI">
+    <h2>3D Helicopter — Advanced</h2>
+    <p>Controls: W/S = Up/Down • A/D = Left/Right • R/F = Forward/Backward • Q/E = Yaw • Space = Rocket • F = Gun</p>
+    <div>
+      <button id="startBtn">Start (Fullscreen)</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+    <p style="font-size:12px;opacity:.9;margin-top:8px">Desktop recommended. If browser blocks fullscreen, allow it in the prompt.</p>
+  </div>
+  <div class="hint">Enemies fire back — avoid enemy bullets!</div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
+
+    const container = document.getElementById('game');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000000, 0.0006);
+
+    const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 5000);
+    camera.position.set(0, 6, 18);
+
+    const renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000);
+    container.appendChild(renderer.domElement);
+
+    // Lights
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1.2));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(-10, 30, 10);
+    scene.add(dir);
+
+    // Ground & skybox-ish gradient
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(10000,10000), new THREE.MeshStandardMaterial({color:0x123322}));
+    ground.rotation.x = -Math.PI/2; ground.position.y = -4; scene.add(ground);
+
+    // Load textures
+    const texLoader = new THREE.TextureLoader();
+    const heliTex = texLoader.load('https://steamcdn-a.akamaihd.net/steam/apps/850950/ss_2a4fd45a8749d0df20f2d7616d797d799be0bd59.1920x1080.jpg?t=1538987458');
+    const enemyTex = texLoader.load('https://tse2.mm.bing.net/th/id/OIP.81_yypqrB45FjDjPicFebwHaEK?rs=1&pid=ImgDetMain&o=7&rm=3');
+
+    // Helicopter (textured plane-like box) — allow 4D-ish movement (x,y,z + yaw)
+    const heli = new THREE.Group();
+    const heliMesh = new THREE.Mesh(new THREE.BoxGeometry(6,2.6,2.6), new THREE.MeshBasicMaterial({map:heliTex}));
+    heliMesh.castShadow = true; heli.add(heliMesh);
+    heli.position.set(0, 3, 0);
+    scene.add(heli);
+
+    // Enemies
+    const enemies = [];
+    const enemyBullets = [];
+
+    function spawnEnemy(){
+      const box = new THREE.Mesh(new THREE.BoxGeometry(5.5,2.5,3.2), new THREE.MeshBasicMaterial({map:enemyTex}));
+      box.position.set((Math.random()-0.5)*120, 2 + Math.random()*8, -800 - Math.random()*800);
+      box.userData = {speed: 0.6 + Math.random()*0.6, shootTimer: 1 + Math.random()*3};
+      scene.add(box); enemies.push(box);
+    }
+
+    // Projectiles
+    const rockets = [];
+    const bullets = [];
+
+    function createRocket(){
+      const geo = new THREE.CylinderGeometry(0.2,0.2,3,8);
+      const mat = new THREE.MeshStandardMaterial({emissive:0xff4422, metalness:0.3, roughness:0.6});
+      const r = new THREE.Mesh(geo, mat);
+      r.rotation.z = Math.PI/2;
+      r.position.copy(heli.position);
+      r.userData = {speed: 220};
+      scene.add(r); rockets.push(r);
+    }
+    function createBullet(){
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.18,8,8), new THREE.MeshStandardMaterial({emissive:0xffff99}));
+      b.position.copy(heli.position);
+      b.userData = {speed: 360};
+      scene.add(b); bullets.push(b);
+    }
+    function createEnemyBullet(pos, dirVec){
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.22,8,8), new THREE.MeshStandardMaterial({emissive:0xff9999}));
+      b.position.copy(pos);
+      b.userData = {dir: dirVec.clone().normalize(), speed: 260};
+      scene.add(b); enemyBullets.push(b);
+    }
+
+    // Explosion particle system
+    const explosions = [];
+    function spawnExplosion(position){
+      const particles = [];
+      const group = new THREE.Group();
+      const particleCount = 18 + Math.floor(Math.random()*18);
+      for(let i=0;i<particleCount;i++){
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.12,6,6), new THREE.MeshBasicMaterial({color: 0xff6600}));
+        p.position.copy(position);
+        p.userData = {vel: new THREE.Vector3((Math.random()-0.5)*6,(Math.random()-0.2)*6,(Math.random()-0.5)*6), life: 0, maxLife: 1 + Math.random()*0.8};
+        group.add(p); particles.push(p);
+      }
+      scene.add(group);
+      explosions.push({group, particles});
+      setTimeout(()=>{ // fade out cleanup safety
+        // will be removed in update loop
+      }, 2000);
+    }
+
+    // Input
+    const keys = {};
+    window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()] = true; if(e.key === ' ') createRocket(); if(e.key.toLowerCase() === 'f') createBullet(); });
+    window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
+
+    // UI & state
+    let running = false, score = 0, level = 1; let lastTime = performance.now();
+    const scoreEl = document.getElementById('score'); const altEl = document.getElementById('alt'); const spdEl = document.getElementById('spd'); const lvlEl = document.getElementById('lvl');
+    const overlay = document.getElementById('overlay');
+    document.getElementById('startBtn').onclick = ()=>{ startGame(); try{ renderer.domElement.requestFullscreen(); }catch(e){} };
+    document.getElementById('resetBtn').onclick = ()=>{ resetGame(); };
+
+    function startGame(){
+      running = true; score = 0; level = 1; overlay.style.display='none';
+      enemies.forEach(e=>scene.remove(e)); enemies.length=0;
+      rockets.forEach(r=>scene.remove(r)); rockets.length=0;
+      bullets.forEach(b=>scene.remove(b)); bullets.length=0;
+      enemyBullets.forEach(b=>scene.remove(b)); enemyBullets.length=0;
+      explosions.forEach(ex=>scene.remove(ex.group)); explosions.length=0;
+      for(let i=0;i<5;i++) spawnEnemy();
+      heli.position.set(0,3,0); heli.rotation.set(0,0,0);
+      lastTime = performance.now();
+    }
+    function resetGame(){ running=false; overlay.style.display='block'; score=0; level=1; scoreEl.textContent='0'; lvlEl.textContent='1'; }
+    function gameOver(){ running=false; overlay.style.display='block'; overlay.querySelector('h2').textContent='Game Over'; overlay.querySelector('p').textContent='Score: '+Math.floor(score)+' • Press Reset'; }
+
+    // Collision helpers
+    const boxHeli = new THREE.Box3();
+
+    // Main loop
+    function animate(now){
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, (now - lastTime)/1000);
+      lastTime = now;
+
+      if(running){
+        // Helicopter 4D movement: x,y,z and yaw
+        if(keys['w']) heli.position.y += 12*dt; // up
+        if(keys['s']) heli.position.y -= 12*dt; // down
+        if(keys['a']) heli.position.x -= 18*dt; // left
+        if(keys['d']) heli.position.x += 18*dt; // right
+        if(keys['r']) heli.position.z -= 120*dt; // forward (negative z)
+        if(keys['f']) heli.position.z += 120*dt; // backward
+        if(keys['q']) heli.rotation.y += 1.8*dt; // yaw left
+        if(keys['e']) heli.rotation.y -= 1.8*dt; // yaw right
+
+        // clamp
+        heli.position.x = THREE.MathUtils.clamp(heli.position.x, -240, 240);
+        heli.position.y = THREE.MathUtils.clamp(heli.position.y, 1, 40);
+        heli.position.z = THREE.MathUtils.clamp(heli.position.z, -2000, 200);
+
+        // Enemies move toward player and may shoot
+        for(let i=enemies.length-1;i>=0;i--){
+          const en = enemies[i];
+          // move forward relative to world
+          en.position.z += (20 + en.userData.speed*40) * dt;
+          // slight lateral tracking to heli
+          const dx = (heli.position.x - en.position.x) * 0.02 * dt * 60;
+          const dy = (heli.position.y - en.position.y) * 0.02 * dt * 60;
+          en.position.x += dx; en.position.y += dy;
+
+          // shooting timer
+          en.userData.shootTimer -= dt;
+          if(en.userData.shootTimer <= 0){
+            // shoot toward current heli position
+            const dir = new THREE.Vector3().subVectors(heli.position, en.position).normalize();
+            createEnemyBullet(en.position, dir);
+            en.userData.shootTimer = 1.2 + Math.random()*2.0; // reset
+          }
+
+          // recycle or removed if past
+          if(en.position.z > camera.position.z + 200){ scene.remove(en); enemies.splice(i,1); spawnEnemy(); score += 80; }
+
+          // collision with rockets/bullets
+          for(let rI = rockets.length-1; rI >= 0; rI--){
+            const r = rockets[rI]; if(r.position.distanceTo(en.position) < 8){ spawnExplosion(en.position); scene.remove(en); enemies.splice(i,1); scene.remove(r); rockets.splice(rI,1); spawnEnemy(); score += 350; break; }
+          }
+          for(let bI = bullets.length-1; bI >= 0; bI--){
+            const b = bullets[bI]; if(b.position.distanceTo(en.position) < 5){ spawnExplosion(en.position); scene.remove(en); enemies.splice(i,1); scene.remove(b); bullets.splice(bI,1); spawnEnemy(); score += 180; break; }
+          }
+        }
+
+        // Update rockets and bullets (player)
+        for(let i=rockets.length-1;i>=0;i--){ const r = rockets[i]; r.position.z -= r.userData.speed * dt; if(r.position.z < -5000){ scene.remove(r); rockets.splice(i,1); } }
+        for(let i=bullets.length-1;i>=0;i--){ const b = bullets[i]; b.position.z -= b.userData.speed * dt; if(b.position.z < -5000){ scene.remove(b); bullets.splice(i,1); } }
+
+        // Enemy bullets movement & collision with heli
+        for(let i=enemyBullets.length-1;i>=0;i--){ const eb = enemyBullets[i]; eb.position.addScaledVector(eb.userData.dir, eb.userData.speed * dt); if(eb.position.distanceTo(heli.position) < 3.2){ spawnExplosion(heli.position); scene.remove(eb); enemyBullets.splice(i,1); gameOver(); break; } if(eb.position.z > camera.position.z + 300 || eb.position.z < -5000){ scene.remove(eb); enemyBullets.splice(i,1); } }
+
+        // Update explosions (particles)
+        for(let exI = explosions.length-1; exI >= 0; exI--){ const ex = explosions[exI]; let remove = true; for(const p of ex.particles){ p.userData.life += dt; p.position.addScaledVector(p.userData.vel, dt*60); p.material.opacity = Math.max(0, 1 - (p.userData.life / p.userData.maxLife)); p.scale.multiplyScalar(1 + dt*2); if(p.userData.life < p.userData.maxLife) remove = false; } if(remove){ scene.remove(ex.group); explosions.splice(exI,1); } }
+
+        // level progression
+        if(score > level * 1200){ level++; lvlEl.textContent = level; for(let i=0;i<2+level;i++) spawnEnemy(); }
+
+        score += dt * 25;
+        scoreEl.textContent = Math.floor(score);
+        altEl.textContent = heli.position.y.toFixed(1);
+        spdEl.textContent = (Math.max(0, 100 + heli.position.z * -0.02)).toFixed(0);
+      }
+
+      // Camera follow
+      const desired = new THREE.Vector3().copy(heli.position).add(new THREE.Vector3(0, 6, 18));
+      camera.position.lerp(desired, 0.06);
+      camera.lookAt(heli.position.x, heli.position.y, heli.position.z);
+
+      renderer.render(scene, camera);
+    }
+
+    // resize
+    window.addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+
+    animate(performance.now());
+  </script>
+</body>
+</html>

@@ -1,25 +1,235 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        #image{
-            border
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Beautiful Card</title>
+  <style>
+    :root{
+      --bg: #0f1724;
+      --card-bg: rgba(255,255,255,0.06);
+      --glass: rgba(255,255,255,0.06);
+      --accent1: #7c3aed; /* purple */
+      --accent2: #06b6d4; /* teal */
+      --accent3: #f97316; /* orange */
+      --glass-border: rgba(255,255,255,0.08);
+      --radius: 20px;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #071026 0%, #0b1220 100%);
+      color: #e6eef8;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:40px;
+      box-sizing:border-box;
+    }
+
+    .wrapper{
+      max-width:980px;
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    /* Card with gradient border */
+    .card {
+      position: relative;
+      width: min(760px, 95%);
+      border-radius: calc(var(--radius) + 6px);
+      padding: 8px; /* space for gradient border */
+      background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+      transition: transform 280ms cubic-bezier(.2,.9,.2,1), box-shadow 280ms;
+      will-change: transform;
+    }
+
+    /* inner panel: glass effect */
+    .card__inner{
+      border-radius: var(--radius);
+      padding: 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015));
+      backdrop-filter: blur(8px) saturate(120%);
+      -webkit-backdrop-filter: blur(8px) saturate(120%);
+      border: 1px solid var(--glass-border);
+      display:flex;
+      gap: 28px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+
+    /* gradient border overlay (fancier) */
+    .card::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      border-radius: calc(var(--radius) + 6px);
+      padding:2px;
+      background: conic-gradient(from 140deg at 50% 50%, var(--accent1), var(--accent2), var(--accent3), var(--accent1));
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events:none;
+      z-index:1;
+      opacity:0.95;
+    }
+
+    .card__inner > * { z-index:2; } /* bring content above border overlay */
+
+    .media{
+      flex: 0 1 220px;
+      min-width:160px;
+      max-width:260px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .media__thumb{
+      width: 160px;
+      height:160px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      display:grid;
+      place-items:center;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 6px 22px rgba(2,6,23,0.55);
+      transition: transform 320ms ease;
+    }
+
+    .content{
+      flex: 1 1 380px;
+      min-width:220px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    h1{
+      margin:0;
+      font-size:1.5rem;
+      letter-spacing:-0.5px;
+    }
+
+    p.lead{
+      margin:0;
+      opacity:0.9;
+      color: #cfe8ff;
+    }
+
+    p.hindi{
+      margin:0;
+      color:#dfefff;
+      opacity:0.95;
+      font-weight:500;
+      font-size:0.95rem;
+    }
+
+    .price-row{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+
+    .price {
+      font-weight:700;
+      font-size:1.25rem;
+      background: linear-gradient(90deg, var(--accent2), var(--accent1));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .btn{
+      --pad-x:16px;
+      --pad-y:10px;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: var(--pad-y) var(--pad-x);
+      border-radius: 12px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid rgba(255,255,255,0.06);
+      color:#eaf6ff;
+      font-weight:600;
+      text-decoration:none;
+      cursor:pointer;
+      box-shadow: 0 6px 18px rgba(11,22,40,0.45);
+      transition: transform 220ms ease, box-shadow 220ms ease;
+    }
+
+    .btn:active{ transform: translateY(1px) scale(0.996); }
+
+    /* subtle lift on hover */
+    .card:hover{
+      transform: translateY(-8px) scale(1.004);
+      box-shadow: 0 20px 50px rgba(2,6,23,0.7);
+    }
+    .card:hover .media__thumb{ transform: translateY(-6px) rotate(-1deg) scale(1.02); }
+
+    /* small screens */
+    @media (max-width:720px){
+      .card__inner{ padding:20px; gap:16px; }
+      .media{ flex-basis:100%; display:flex; justify-content:flex-start; }
+      .media__thumb{ width:120px; height:120px; border-radius:14px; }
+      .content{ flex-basis:100%; }
+      h1{ font-size:1.25rem; }
+    }
+
+    /* decorative small text */
+    .muted {
+      font-size:0.85rem;
+      opacity:0.75;
+      color:#b9d7ff;
+    }
+  </style>
 </head>
 <body>
-    <div id="image">
-        <div class="class"  id=""one>1</div>
-        <div class="class"  id="two">2</div>
-        <div class="class"  id="three">3</div>
-        <div class="class"  id="four">4</div>
-        <div class="class"  id="five">5</div>
-        <div class="class"  id="six">6</div>
-        <div class="class"  id="seven">7</div>
-        <div class="class"  id="eight">8</div>
-    </div>
+  <div class="wrapper">
+    <article class="card" aria-label="Simple Beautiful Card">
+      <div class="card__inner">
+        <div class="media" aria-hidden="true">
+          <div class="media__thumb">
+            <!-- simple SVG decorative icon -->
+            <svg width="88" height="88" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="#7c3aed"/>
+                  <stop offset="1" stop-color="#06b6d4"/>
+                </linearGradient>
+              </defs>
+              <rect x="1.5" y="1.5" width="21" height="21" rx="6" stroke="url(#g)" stroke-width="1.8" fill="rgba(255,255,255,0.02)"/>
+              <path d="M7 12h10M7 8h10M7 16h6" stroke="url(#g)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="content">
+          <div>
+            <h1>Pro UI Components</h1>
+            <p class="lead muted">Glass • Gradient • Simple Motion — Responsive Pure CSS Modern</p>
+          </div>
+
+          <p class="hindi">Ek clean, elegant card jo premium feel deta hai. Gradient border, glass panel aur hover par soft lift — sab kuch simple CSS ke saath.</p>
+
+          <div class="price-row">
+            <div class="price">₹999</div>
+            <a class="btn" href="#" role="button" onclick="event.preventDefault(); alert('Thanks — demo button clicked!');">
+              Get Now
+            </a>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
 </body>
 </html>
